@@ -1,0 +1,59 @@
+name: Deploy Preview
+
+on:
+  pull_request:
+    branches:
+      - main
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID_MARKETING: ${{ secrets.VERCEL_PROJECT_ID_MARKETING }}
+  VERCEL_PROJECT_ID_DASHBOARD: ${{ secrets.VERCEL_PROJECT_ID_DASHBOARD }}
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        app:
+          - marketing
+          - dashboard
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel
+
+      - name: Pull Vercel Environment
+        run: |
+          vercel pull \
+            --yes \
+            --environment=preview \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Preview
+        run: |
+          vercel build \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Preview
+        run: |
+          vercel deploy \
+            --prebuilt \
+            --token=${{ secrets.VERCEL_TOKEN }}
