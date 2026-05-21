@@ -1,0 +1,102 @@
+# .github/workflows/deploy-production.yml
+name: Deploy Production
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: production
+      url: https://novaspire.online
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Database Migrations
+        run: pnpm db:migrate:production
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Deploy Marketing Site
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_MARKETING_PROJECT_ID }}
+          working-directory: apps/marketing
+          vercel-args: '--prod --build-env NODE_ENV=production'
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+
+      - name: Deploy Dashboard
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_DASHBOARD_PROJECT_ID }}
+          working-directory: apps/dashboard
+          vercel-args: '--prod --build-env NODE_ENV=production'
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+
+      - name: Deploy API
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_API_PROJECT_ID }}
+          working-directory: apps/api
+          vercel-args: '--prod --build-env NODE_ENV=production'
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+
+      - name: Deploy Admin
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          working-directory: apps/admin
+          vercel-args: '--prod --build-env NODE_ENV=production'
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: |
+             **Production Deployment**
+            
+            Deployed from commit: ${{ github.sha }}
+            Run: ${{ github.run_id }}
+            
+            | App | URL |
+            |:---|:---|
+            | Marketing | https://novaspire.online |
+            | Dashboard | https://app.novaspire.online |
+            | API | https://api.novaspire.online |
+            | Admin | https://admin.novaspire.online |
+          generate_release_notes: true
