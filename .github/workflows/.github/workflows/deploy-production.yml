@@ -1,0 +1,64 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: 20
+  PNPM_VERSION: 9
+
+jobs:
+  deploy-production:
+    name: Production Deployment
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        app:
+          - marketing
+          - dashboard
+          - api
+          - admin
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Turbo Monorepo
+        run: pnpm build
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel
+
+      - name: Pull Production Environment
+        run: |
+          vercel pull \
+            --yes \
+            --environment=production \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Production
+        run: |
+          vercel deploy \
+            --prod \
+            --prebuilt \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deployment Complete
+        run: echo "Production deployment successful."
